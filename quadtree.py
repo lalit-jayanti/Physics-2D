@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
+
 class Node:
 
     def __init__(self, x, y, data=None) -> None:
@@ -136,14 +137,14 @@ class quadTree:
              self.boundary.center.y-self.boundary.half_dimension),
             width=2*self.boundary.half_dimension,
             height=2*self.boundary.half_dimension,
-            facecolor=(1,1,1,0),
+            facecolor=(1, 1, 1, 0),
             edgecolor='blue',
             linewidth=1)
 
         ax.add_patch(rect)
 
-        for point in self.points:
-            plt.plot(point.x, point.y, 'r.')
+        # for point in self.points:
+        #     ax.plot(point.x, point.y, 'r.')
 
         if self.northWest is not None:
 
@@ -174,7 +175,6 @@ if __name__ == '__main__':
 
     qt.visualize(ax)
 
-
     bx = boundingBox(20, 30, 25)
 
     rect = patches.Rectangle(
@@ -182,7 +182,7 @@ if __name__ == '__main__':
          bx.center.y-bx.half_dimension),
         width=2*bx.half_dimension,
         height=2*bx.half_dimension,
-        facecolor=(1,1,1,0),
+        facecolor=(1, 1, 1, 0),
         edgecolor='g',
         linewidth=1)
 
