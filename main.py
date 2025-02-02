@@ -35,10 +35,10 @@ class Environment:
 
     def __init__(self, debug=False):
 
-        self.objects = [Circle(np.random.uniform(low=0.1, high=0.1),
+        self.objects = [Circle(np.random.uniform(low=0.1, high=2),
                                np.random.uniform(low=-5, high=5, size=2),
-                               np.random.uniform(low=-20, high=20, size=2))
-                        for i in range(500)]
+                               np.random.uniform(low=0, high=0, size=2))
+                        for i in range(25)]
 
         self.radius = 10
         self.max_obj_radius = max(self.objects, key=lambda x: x.radius).radius
@@ -54,7 +54,8 @@ class Environment:
     def apply_forces(self):
 
         for obj in self.objects:
-            obj.acc[1] = -30
+            obj.acc[1] = -10
+            obj.acc[0] = 0
 
     def step(self, dt=0.01):
 
@@ -201,6 +202,8 @@ class Environment:
         for patch in self.patches:
             self.sim_ax.add_patch(patch)
 
+        plt.tight_layout()
+
     def simulate(self, time_steps=100, dt=0.01):
 
         self.setup_rendering()
@@ -208,8 +211,11 @@ class Environment:
         for t in range(time_steps):
 
             self.apply_forces()
-            self.step(dt)
-            self.handle_collisions()
+
+            sub_steps = 5
+            for _ in range(sub_steps):
+                self.step(dt/sub_steps)
+                self.handle_collisions()
 
             self.render(t)
 
@@ -230,7 +236,7 @@ class Environment:
 
 def main():
 
-    env = Environment(debug=False)
+    env = Environment(debug=True)
     env.simulate(time_steps=1000, dt=0.01)
 
 
