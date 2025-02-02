@@ -33,7 +33,7 @@ class Circle:
 
 class Environment:
 
-    def __init__(self):
+    def __init__(self, debug=False):
 
         self.objects = [Circle(np.random.uniform(low=0.1, high=0.1),
                                np.random.uniform(low=-5, high=5, size=2),
@@ -43,6 +43,8 @@ class Environment:
         self.radius = 10
         self.max_obj_radius = max(self.objects, key=lambda x: x.radius).radius
         self.qtree = None
+
+        self.debug = debug
 
     def make_qtree(self):
         self.qtree = quadTree(boundary=boundingBox(0, 0, self.radius))
@@ -158,7 +160,6 @@ class Environment:
                 obj1.vel += self.collision_vel(obj1.mass, obj2.mass, v1, v2)
                 obj2.vel += self.collision_vel(obj2.mass, obj1.mass, v2, v1)
 
-    @calc_time
     def handle_collisions(self):
         self.quad_tree_collisions()
         # self.brute_handle_collisions()
@@ -168,25 +169,50 @@ class Environment:
         for i, obj in enumerate(self.objects):
             self.patches[i+1].center = obj.pos[0], obj.pos[1]
 
-        phy_qty = self.compute_physical_quantities()
-        # self.ax[1].plot(t, phy_qty['momentum'][0], "ro")
-        # self.ax[1].plot(t, phy_qty['momentum'][1], "go")
-        # self.ax[1].plot(t, np.linalg.norm(phy_qty['momentum']), "bo")
-        self.ax[1].plot(t, phy_qty['kinetic_energy'], "bo")
+        if self.debug:
 
-        # if self.qtree is not None:
-        #     for patch in self.ax[0].patches:
-        #         if isinstance(patch, patches.Rectangle):
-        #             patch.remove()
-        #     self.qtree.visualize(self.ax[0])
+            phy_qty = self.compute_physical_quantities()
+
+            self.phy_ax[0].plot(t, phy_qty['momentum'][0], "ro")
+            self.phy_ax[0].plot(t, phy_qty['momentum'][1], "go")
+            self.phy_ax[0].plot(t, np.linalg.norm(phy_qty['momentum']), "bo")
+
+            self.phy_ax[1].plot(t, phy_qty['kinetic_energy'], "bo")
+
+            if self.qtree is not None:
+                for patch in self.sim_ax.patches:
+                    if isinstance(patch, patches.Rectangle):
+                        patch.remove()
+                self.qtree.visualize(self.sim_ax)
 
     def setup_rendering(self):
 
-        self.fig, self.ax = plt.subplots(nrows=2, ncols=1,
-                                         height_ratios=[2, 1])
-        self.ax[0].set_xlim([-11, 11])
-        self.ax[0].set_ylim([-11, 11])
-        self.ax[0].set_aspect('equal')
+        if self.debug:
+
+            self.fig = plt.figure(figsize=(8, 4), constrained_layout=True)
+            self.gs = self.fig.add_gridspec(2, 2)
+
+            self.sim_ax = self.fig.add_subplot(self.gs[:, 0])
+
+            self.phy_ax = [self.fig.add_subplot(self.gs[0, 1]),
+                           self.fig.add_subplot(self.gs[1, 1])]
+
+            self.phy_ax[0].set_xlabel('Time s')
+            self.phy_ax[0].set_ylabel('Momentum kg m/s')
+
+            self.phy_ax[1].set_xlabel('Time s')
+            self.phy_ax[1].set_ylabel('Kinetic Energy J')
+
+            for ax in self.phy_ax:
+                ax.grid('on')
+
+        else:
+            self.fig, self.sim_ax = plt.subplots(figsize=(4, 4))
+            self.sim_ax.set_axis_off()
+
+        self.sim_ax.set_xlim([-self.radius, self.radius])
+        self.sim_ax.set_ylim([-self.radius, self.radius])
+        self.sim_ax.set_aspect('equal')
 
         cmap = cm.get_cmap("plasma")
 
@@ -196,7 +222,7 @@ class Environment:
                                            color=cmap(np.random.uniform())))
 
         for patch in self.patches:
-            self.ax[0].add_patch(patch)
+            self.sim_ax.add_patch(patch)
 
     def simulate(self, time_steps=100, dt=0.01):
 
@@ -227,7 +253,7 @@ class Environment:
 
 def main():
 
-    env = Environment()
+    env = Environment(debug=False)
     env.simulate(time_steps=1000, dt=0.01)
 
 
