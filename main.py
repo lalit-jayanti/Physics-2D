@@ -19,10 +19,10 @@ class Environment:
 
     def __init__(self):
 
-        self.objects = [Circle(np.random.uniform(low=3, high=3),
+        self.objects = [Circle(np.random.uniform(low=0.3, high=0.3),
                                np.random.uniform(low=-5, high=5, size=2),
-                               np.random.uniform(low=-10, high=10, size=2))
-                        for i in range(2)]
+                               np.random.uniform(low=-20, high=20, size=2))
+                        for i in range(200)]
 
         self.radius = 10
 
@@ -96,7 +96,7 @@ class Environment:
         self.ax[0].set_ylim([-11, 11])
         self.ax[0].set_aspect('equal')
 
-        cmap = cm.get_cmap("viridis")
+        cmap = cm.get_cmap("hsv")
 
         self.patches = [plt.Circle((0, 0), self.radius, color='black')]
         for obj in self.objects:
@@ -119,9 +119,10 @@ class Environment:
             self.render()
 
             phy_qty = self.compute_physical_quantities()
-            self.ax[1].plot(t, phy_qty['momentum'][0], "ro")
-            self.ax[1].plot(t, phy_qty['momentum'][1], "go")
-            self.ax[1].plot(t, np.linalg.norm(phy_qty['momentum']), "bo")
+            # self.ax[1].plot(t, phy_qty['momentum'][0], "ro")
+            # self.ax[1].plot(t, phy_qty['momentum'][1], "go")
+            # self.ax[1].plot(t, np.linalg.norm(phy_qty['momentum']), "bo")
+            self.ax[1].plot(t, phy_qty['kinetic_energy'], "bo")
 
 
             plt.pause(0.001)
@@ -142,7 +143,7 @@ class Environment:
 def main():
 
     env = Environment()
-    env.simulate(time_steps=1000, dt=0.005)
+    env.simulate(time_steps=1000, dt=0.01)
 
 
 if __name__ == '__main__':
