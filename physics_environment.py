@@ -6,6 +6,7 @@ import time
 
 from quadtree import quadTree, boundingBox, Node
 
+
 def calc_time(func):
 
     def wrapper(*args, **kwargs):
@@ -16,6 +17,40 @@ def calc_time(func):
         return result
 
     return wrapper
+
+
+class Spring:
+
+    def __init__(self, obj1, obj2,
+                 length=1,
+                 spring_constant=1,
+                 damping_constant=0):
+
+        self.obj1 = obj1
+        self.obj2 = obj2
+        self.length = length
+        self.spring_constant = spring_constant
+        self.damping_constant = damping_constant
+
+    def apply(self):
+
+        direction = self.obj2.pos-self.obj1.pos
+        distance = np.linalg.norm(direction)
+        direction /= distance
+
+        elongation = distance - self.length
+
+        self.obj1.acc += (
+            + self.spring_constant*direction*elongation
+            - self.damping_constant*direction
+            * np.dot(self.obj1.vel-self.obj2.vel, direction)
+        )/self.obj1.mass
+
+        self.obj2.acc += (
+            - self.spring_constant*direction*elongation
+            - self.damping_constant*direction
+            * np.dot(self.obj2.vel-self.obj1.vel, direction)
+        )/self.obj2.mass
 
 
 class Circle:
@@ -32,7 +67,7 @@ class Circle:
 
 class Environment:
 
-    def __init__(self, objects, debug=False):
+    def __init__(self, objects, force_fields=[], springs=[], debug=False):
 
         self.objects = objects
 
@@ -40,10 +75,11 @@ class Environment:
         self.qtree = None
 
         self.debug = debug
-        self.cmap = cm.get_cmap("plasma")
+        self.cmap = cm.get_cmap("viridis")
 
         self.radius = 10
-        self.gravity = [0, -10]
+        self.force_fields = force_fields
+        self.springs = springs
 
     def make_qtree(self):
         self.qtree = quadTree(boundary=boundingBox(0, 0, self.radius))
@@ -52,9 +88,12 @@ class Environment:
 
     def apply_forces(self):
 
-        for obj in self.objects:
-            obj.acc[0] = self.gravity[0]
-            obj.acc[1] = self.gravity[1]
+        for field in self.force_fields:
+            for obj in self.objects:
+                field(obj)
+
+        for spring in self.springs:
+            spring.apply()
 
     def step(self, dt=0.01):
 
@@ -201,7 +240,7 @@ class Environment:
 
         plt.tight_layout()
 
-    def simulate(self, time_steps=100, dt=0.01):
+    def simulate(self, time_steps=100, sub_steps=1, dt=0.01):
 
         self.setup_rendering()
 
@@ -209,7 +248,6 @@ class Environment:
 
             self.apply_forces()
 
-            sub_steps = 5
             for _ in range(sub_steps):
                 self.step(dt/sub_steps)
                 self.handle_collisions()
