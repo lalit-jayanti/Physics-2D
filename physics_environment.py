@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.patches as patches
+import matplotlib.lines as lines
+from matplotlib.animation import FuncAnimation, PillowWriter, FFMpegWriter
 import time
 
 from quadtree import quadTree, boundingBox, Node
@@ -36,6 +38,9 @@ class Spring:
 
         direction = self.obj2.pos-self.obj1.pos
         distance = np.linalg.norm(direction)
+        if (distance == 0):
+            return
+
         direction /= distance
 
         elongation = distance - self.length
@@ -67,7 +72,13 @@ class Circle:
 
 class Environment:
 
-    def __init__(self, objects, force_fields=[], springs=[], debug=False):
+    def __init__(self, objects,
+                 force_fields=[],
+                 springs=[],
+                 wall_restitution_coeff=0.8,
+                 circle_restitution_coeff=0.99,
+                 display_qtree=False,
+                 debug=False):
 
         self.objects = objects
 
@@ -75,11 +86,15 @@ class Environment:
         self.qtree = None
 
         self.debug = debug
-        self.cmap = cm.get_cmap("viridis")
+        self.display_qtree = display_qtree
+        self.cmap = cm.get_cmap("plasma")
 
         self.radius = 10
         self.force_fields = force_fields
         self.springs = springs
+
+        self.wall_restitution_coeff = wall_restitution_coeff   # wall-circle collision
+        self.circle_restitution_coeff = circle_restitution_coeff  # circle-circle collison
 
     def make_qtree(self):
         self.qtree = quadTree(boundary=boundingBox(0, 0, self.radius))
@@ -103,8 +118,7 @@ class Environment:
             obj.acc[0], obj.acc[1] = 0, 0
 
     def collision_vel(self, m1, m2, v1, v2):
-
-        return ((m1-m2)*v1 + 2*m2*v2)/(m1+m2)
+        return (self.circle_restitution_coeff*m2*(v2-v1)+m1*v1+m2*v2)/(m1+m2)
 
     def handle_circle_circle(self, obj1, obj2):
 
@@ -142,7 +156,11 @@ class Environment:
             rad_pos = (obj.pos[0]**2 + obj.pos[1]**2)**0.5 + obj.radius
             if rad_pos > self.radius:
                 obj.pos *= self.radius/rad_pos
-                obj.vel *= -1
+
+                wall_normal = -obj.pos/np.linalg.norm(obj.pos)
+                normal_vel = wall_normal*np.dot(obj.vel, wall_normal)
+                obj.vel -= normal_vel
+                obj.vel += -self.wall_restitution_coeff*normal_vel
 
         for i in range(len(self.objects)):
             obj1 = self.objects[i]
@@ -152,20 +170,29 @@ class Environment:
 
     def quad_tree_collisions(self):
 
+        epsilon = 1e-2  # tolerance for quadtree query
+
         self.make_qtree()
 
         for obj in self.objects:
             rad_pos = (obj.pos[0]**2 + obj.pos[1]**2)**0.5 + obj.radius
             if rad_pos > self.radius:
                 obj.pos *= self.radius/rad_pos
-                obj.vel *= -1
+
+                wall_normal = -obj.pos/np.linalg.norm(obj.pos)
+                if (np.dot(obj.vel, wall_normal) >= 0):
+                    return
+
+                normal_vel = wall_normal*np.dot(obj.vel, wall_normal)
+                obj.vel -= normal_vel
+                obj.vel += -self.wall_restitution_coeff*normal_vel
 
         for i in range(len(self.objects)):
             obj1 = self.objects[i]
             points = self.qtree.queryRange(box=boundingBox(
                 x_center=obj1.pos[0],
                 y_center=obj1.pos[1],
-                half_dimension=obj1.radius+self.max_obj_radius+1e-3
+                half_dimension=obj1.radius+self.max_obj_radius+epsilon
             ))
 
             for point in points:
@@ -183,7 +210,12 @@ class Environment:
     def render(self, t):
 
         for i, obj in enumerate(self.objects):
+            # self.patches[0] is reserved for the background
             self.patches[i+1].center = obj.pos[0], obj.pos[1]
+
+        for i, spring in enumerate(self.springs):
+            self.lines[i].set_data([spring.obj1.pos[0], spring.obj2.pos[0]],
+                                   [spring.obj1.pos[1], spring.obj2.pos[1]])
 
         if self.debug:
 
@@ -195,6 +227,8 @@ class Environment:
 
             self.phy_ax[1].plot(t, phy_qty['kinetic_energy'], "bo")
 
+        if self.display_qtree:
+
             if self.qtree is not None:
                 for patch in self.sim_ax.patches:
                     if isinstance(patch, patches.Rectangle):
@@ -202,6 +236,9 @@ class Environment:
                 self.qtree.visualize(self.sim_ax)
 
     def setup_rendering(self):
+
+        plt.clf()
+        plt.cla()
 
         if self.debug:
 
@@ -231,12 +268,23 @@ class Environment:
         self.sim_ax.set_aspect('equal')
 
         self.patches = [plt.Circle((0, 0), self.radius, color='black')]
+        self.lines = []
+
         for obj in self.objects:
             self.patches.append(plt.Circle(obj.pos, obj.radius,
                                            color=self.cmap(np.random.uniform())))
 
+        for spring in self.springs:
+            self.lines.append(plt.Line2D([spring.obj1.pos[0], spring.obj2.pos[0]],
+                                         [spring.obj1.pos[1], spring.obj2.pos[1]],
+                                         color=self.cmap(np.random.uniform()),
+                                         linewidth=2))
+
         for patch in self.patches:
             self.sim_ax.add_patch(patch)
+
+        for line in self.lines:
+            self.sim_ax.add_line(line)
 
         plt.tight_layout()
 
@@ -255,6 +303,23 @@ class Environment:
             self.render(t)
 
             plt.pause(0.001)
+
+    def save_animation(self, fname, time_steps=100, sub_steps=1, dt=0.01, fps=16):
+
+        self.setup_rendering()
+
+        def update(frame):
+            self.apply_forces()
+
+            for _ in range(sub_steps):
+                self.step(dt/sub_steps)
+                self.handle_collisions()
+
+            self.render(frame)
+
+        animation = FuncAnimation(self.fig, update, frames=time_steps)
+        gif_writer = PillowWriter(fps=fps)
+        animation.save(fname, writer=gif_writer)
 
     def compute_physical_quantities(self):
 

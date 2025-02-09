@@ -139,7 +139,7 @@ class quadTree:
             height=2*self.boundary.half_dimension,
             facecolor=(1, 1, 1, 0),
             edgecolor='blue',
-            linewidth=1)
+            linewidth=0.5)
 
         ax.add_patch(rect)
 
