@@ -21,6 +21,28 @@ def calc_time(func):
     return wrapper
 
 
+class Gravity:
+
+    def __init__(self, objs):
+
+        self.objs = objs
+        self.gravity_const = 10000
+
+    def apply(self):
+
+        for i in range(len(self.objs)):
+            for j in range(i+1, len(self.objs)):
+                obj1 = self.objs[i]
+                obj2 = self.objs[j]
+
+                r = np.linalg.norm(obj1.pos-obj2.pos)
+                magnitude = self.gravity_const*obj1.mass*obj2.mass/(r**2)
+                direction = (obj2.pos-obj1.pos)/r
+
+                obj1.acc += direction*magnitude
+                obj2.acc += -direction*magnitude
+
+
 class Spring:
 
     def __init__(self, obj1, obj2,
@@ -214,6 +236,8 @@ class Environment:
             self.patches[i+1].center = obj.pos[0], obj.pos[1]
 
         for i, spring in enumerate(self.springs):
+            if not isinstance(spring, Spring):
+                continue
             self.lines[i].set_data([spring.obj1.pos[0], spring.obj2.pos[0]],
                                    [spring.obj1.pos[1], spring.obj2.pos[1]])
 
@@ -275,6 +299,8 @@ class Environment:
                                            color=self.cmap(np.random.uniform())))
 
         for spring in self.springs:
+            if not isinstance(spring, Spring):
+                continue
             self.lines.append(plt.Line2D([spring.obj1.pos[0], spring.obj2.pos[0]],
                                          [spring.obj1.pos[1], spring.obj2.pos[1]],
                                          color=self.cmap(np.random.uniform()),
